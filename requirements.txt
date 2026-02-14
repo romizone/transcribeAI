@@ -1,0 +1,10 @@
+flask>=3.0.0
+faster-whisper>=1.0.0
+pydub>=0.25.1
+numpy>=1.24.0
+librosa>=0.10.0
+scikit-learn>=1.3.0
+python-docx>=1.1.0
+# Optional: Apple Silicon acceleration (2-5x faster on M1/M2/M3/M4)
+# Uncomment line below if you have Apple Silicon Mac:
+# mlx-whisper

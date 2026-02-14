@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TranscribeAI</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #F8FAFC; --bg-card: #FFFFFF; --bg-hover: #F1F5F9;
+            --border: #E2E8F0; --border-focus: #4F46E5;
+            --text: #0F172A; --text-secondary: #64748B; --text-muted: #94A3B8;
+            --primary: #4F46E5; --primary-hover: #4338CA; --primary-light: #EEF2FF;
+            --success: #10B981; --success-light: #ECFDF5;
+            --error: #EF4444; --error-light: #FEF2F2;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --radius: 12px; --radius-sm: 8px; --transition: 0.2s ease;
+        }
+        .dark {
+            --bg: #0F172A; --bg-card: #1E293B; --bg-hover: #334155;
+            --border: #334155; --border-focus: #818CF8;
+            --text: #F1F5F9; --text-secondary: #94A3B8; --text-muted: #64748B;
+            --primary: #818CF8; --primary-hover: #6366F1; --primary-light: #1E1B4B;
+            --success-light: #064E3B; --error-light: #450A0A;
+            --shadow: 0 1px 3px rgba(0,0,0,0.4); --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh;
+            transition: background var(--transition), color var(--transition);
+        }
+        .header {
+            background: var(--bg-card); border-bottom: 1px solid var(--border);
+            padding: 14px 24px; display: flex; align-items: center; justify-content: space-between;
+            position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+            width: 36px; height: 36px; background: linear-gradient(135deg, #4F46E5, #7C3AED);
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; color: white;
+        }
+        .app-name { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+        .app-name span { color: var(--primary); }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        .theme-toggle, .btn-icon {
+            width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-size: 16px;
+            transition: all var(--transition);
+        }
+        .theme-toggle:hover, .btn-icon:hover { background: var(--bg-hover); color: var(--text); }
+        .container { max-width: 920px; margin: 0 auto; padding: 28px 20px; }
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+            transition: all var(--transition);
+        }
+        .card + .card { margin-top: 20px; }
+        .card-header {
+            padding: 16px 20px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .card-header h2 { font-size: 15px; font-weight: 600; }
+        .card-body { padding: 20px; }
+
+        /* API Key */
+        .api-key-section {
+            display: flex; gap: 10px; margin-bottom: 20px; align-items: end;
+        }
+        .api-key-section .form-group { flex: 1; }
+        .api-key-section input {
+            padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-card); color: var(--text); font-size: 13px; width: 100%;
+            outline: none; font-family: monospace; transition: border-color var(--transition);
+        }
+        .api-key-section input:focus { border-color: var(--border-focus); }
+        .api-status {
+            font-size: 11px; margin-top: 4px; font-weight: 500;
+        }
+        .api-status.ok { color: var(--success); }
+        .api-status.err { color: var(--error); }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed var(--border); border-radius: var(--radius);
+            padding: 44px 20px; text-align: center; cursor: pointer;
+            transition: all var(--transition); position: relative;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary); background: var(--primary-light);
+        }
+        .upload-zone.has-file {
+            border-color: var(--success); background: var(--success-light); border-style: solid;
+        }
+        .upload-icon { font-size: 44px; margin-bottom: 12px; display: block; }
+        .upload-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+        .upload-subtitle { font-size: 13px; color: var(--text-secondary); }
+        .upload-formats { font-size: 11px; color: var(--text-muted); margin-top: 10px; }
+        .file-info { display: flex; align-items: center; gap: 12px; justify-content: center; }
+        .file-info .file-name { font-weight: 600; font-size: 14px; }
+        .file-info .file-size { color: var(--text-secondary); font-size: 12px; }
+        .file-remove {
+            background: none; border: none; color: var(--error); cursor: pointer;
+            font-size: 18px; padding: 4px; border-radius: 6px;
+        }
+        #file-input { display: none; }
+
+        /* Settings */
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px; }
+        .form-group { display: flex; flex-direction: column; gap: 5px; }
+        .form-group label {
+            font-size: 12px; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .form-group select, .form-group input[type="number"] {
+            padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-card); color: var(--text); font-size: 13px; outline: none;
+            appearance: none; -webkit-appearance: none; transition: border-color var(--transition);
+        }
+        .form-group select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748B' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 30px;
+        }
+        .form-group select:focus, .form-group input:focus { border-color: var(--border-focus); }
+
+        /* Button */
+        .btn-transcribe {
+            width: 100%; padding: 13px; background: linear-gradient(135deg, #4F46E5, #7C3AED);
+            color: white; border: none; border-radius: var(--radius-sm); font-size: 15px;
+            font-weight: 600; cursor: pointer; transition: all var(--transition);
+            margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-transcribe:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,0.4); }
+        .btn-transcribe:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Progress */
+        .progress-section { display: none; }
+        .progress-section.active { display: block; }
+        .progress-stages { display: flex; gap: 4px; margin-bottom: 18px; }
+        .stage { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .stage-dot {
+            width: 30px; height: 30px; border-radius: 50%; background: var(--bg-hover);
+            border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+            font-size: 13px; transition: all 0.4s; color: var(--text-muted);
+        }
+        .stage.active .stage-dot { background: var(--primary-light); border-color: var(--primary); color: var(--primary); animation: pulse 1.5s infinite; }
+        .stage.completed .stage-dot { background: var(--success); border-color: var(--success); color: white; }
+        .stage-label { font-size: 10px; color: var(--text-muted); text-align: center; font-weight: 500; }
+        .stage.active .stage-label { color: var(--primary); font-weight: 600; }
+        .stage.completed .stage-label { color: var(--success); }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .progress-bar-container { background: var(--bg-hover); border-radius: 6px; height: 6px; overflow: hidden; margin-bottom: 10px; }
+        .progress-bar { height: 100%; background: linear-gradient(90deg, #4F46E5, #7C3AED); border-radius: 6px; transition: width 0.4s; width: 0%; }
+        .progress-text { display: flex; justify-content: space-between; font-size: 12px; }
+        .progress-stage-name { color: var(--text-secondary); font-weight: 500; }
+        .progress-percentage { color: var(--primary); font-weight: 600; }
+
+        /* Results */
+        .results-section { display: none; }
+        .results-section.active { display: block; }
+        .stats-bar {
+            display: flex; gap: 20px; padding: 14px 20px; background: var(--primary-light);
+            border-bottom: 1px solid var(--border); flex-wrap: wrap;
+        }
+        .stat { display: flex; align-items: center; gap: 6px; }
+        .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 13px; font-weight: 600; }
+        .audio-player { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+        .audio-player audio { width: 100%; height: 36px; }
+        .speaker-legend {
+            display: flex; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--border);
+            flex-wrap: wrap; background: var(--bg);
+        }
+        .speaker-badge {
+            display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500;
+            padding: 3px 10px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border);
+        }
+        .speaker-badge .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .search-bar { padding: 10px 20px; border-bottom: 1px solid var(--border); }
+        .search-input {
+            width: 100%; padding: 7px 12px 7px 34px; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); background: var(--bg); color: var(--text);
+            font-size: 13px; outline: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: 10px center;
+        }
+        .search-input:focus { border-color: var(--border-focus); }
+        .transcript-container { max-height: 550px; overflow-y: auto; padding: 6px 0; }
+        .transcript-segment {
+            padding: 12px 20px; display: flex; gap: 14px; transition: background var(--transition);
+            cursor: pointer; border-left: 3px solid transparent;
+        }
+        .transcript-segment:hover { background: var(--bg-hover); }
+        .transcript-segment.playing { background: var(--primary-light); border-left-color: var(--primary); }
+        .segment-time {
+            font-size: 11px; color: var(--text-muted); font-weight: 500; min-width: 44px;
+            padding-top: 2px; font-variant-numeric: tabular-nums;
+        }
+        .segment-content { flex: 1; }
+        .segment-speaker {
+            font-size: 12px; font-weight: 700; margin-bottom: 3px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .segment-speaker .speaker-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .segment-text { font-size: 14px; line-height: 1.7; }
+        .export-bar {
+            padding: 14px 20px; border-top: 1px solid var(--border);
+            display: flex; gap: 10px; align-items: center; background: var(--bg); flex-wrap: wrap;
+        }
+        .export-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn-export, .btn-copy-all {
+            padding: 7px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-card); color: var(--text); font-size: 12px; font-weight: 600;
+            cursor: pointer; transition: all var(--transition); display: flex; align-items: center; gap: 5px;
+        }
+        .btn-export:hover, .btn-copy-all:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+        .btn-new {
+            margin-left: auto; padding: 7px 16px; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary);
+            font-size: 12px; font-weight: 500; cursor: pointer;
+        }
+        .btn-new:hover { border-color: var(--text-secondary); color: var(--text); }
+        .error-section { display: none; }
+        .error-section.active { display: block; }
+        .error-box {
+            background: var(--error-light); border: 1px solid var(--error); border-radius: var(--radius-sm);
+            padding: 16px; display: flex; gap: 10px; align-items: flex-start;
+        }
+        .error-message { color: var(--error); font-size: 13px; font-weight: 500; }
+        .error-detail { color: var(--text-secondary); font-size: 12px; margin-top: 4px; }
+        .btn-retry {
+            margin-top: 14px; padding: 9px 20px; background: var(--error); color: white; border: none;
+            border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top-color: white; animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast {
+            position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+            background: var(--text); color: var(--bg); padding: 8px 20px;
+            border-radius: 8px; font-size: 13px; font-weight: 500;
+            opacity: 0; transition: opacity 0.3s; z-index: 1000; pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+        .footer { text-align: center; padding: 20px; color: var(--text-muted); font-size: 11px; }
+        .transcript-container::-webkit-scrollbar { width: 5px; }
+        .transcript-container::-webkit-scrollbar-track { background: transparent; }
+        .transcript-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        @media (max-width: 640px) {
+            .container { padding: 14px; }
+            .settings-grid { grid-template-columns: 1fr; }
+            .api-key-section { flex-direction: column; }
+            .export-bar { flex-direction: column; align-items: stretch; }
+            .btn-new { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">&#127908;</div>
+            <div class="app-name">Transcribe<span>AI</span></div>
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">&#9790;</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Upload Card -->
+        <div class="card" id="upload-card">
+            <div class="card-header">
+                <span>&#128229;</span>
+                <h2>Upload & Transkripsi</h2>
+            </div>
+            <div class="card-body">
+                <!-- API Key -->
+                <div class="api-key-section">
+                    <div class="form-group" style="flex:1">
+                        <label>OpenAI API Key</label>
+                        <input type="password" id="api-key" placeholder="sk-proj-..." oninput="saveApiKey()">
+                        <div class="api-status" id="api-status"></div>
+                    </div>
+                </div>
+
+                <!-- Upload Zone -->
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+                    <div id="upload-placeholder">
+                        <span class="upload-icon">&#128193;</span>
+                        <div class="upload-title">Drag & drop file di sini</div>
+                        <div class="upload-subtitle">atau klik untuk memilih file</div>
+                        <div class="upload-formats">MP3, MP4, WAV, M4A, OGG, FLAC, WEBM</div>
+                    </div>
+                    <div id="file-display" style="display:none">
+                        <div class="file-info">
+                            <span style="font-size:26px">&#127925;</span>
+                            <div>
+                                <div class="file-name" id="file-name"></div>
+                                <div class="file-size" id="file-size"></div>
+                            </div>
+                            <button class="file-remove" onclick="removeFile(event)">&#10005;</button>
+                        </div>
+                    </div>
+                </div>
+                <input type="file" id="file-input" accept=".mp3,.mp4,.wav,.webm,.m4a,.ogg,.flac">
+
+                <!-- Settings -->
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Bahasa</label>
+                        <select id="language">
+                            <option value="">Auto Detect</option>
+                            <option value="id">Bahasa Indonesia</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Jumlah Pembicara</label>
+                        <select id="num-speakers">
+                            <option value="0">Auto Detect</option>
+                            <option value="1">1 Pembicara</option>
+                            <option value="2">2 Pembicara</option>
+                            <option value="3">3 Pembicara</option>
+                            <option value="4">4 Pembicara</option>
+                            <option value="5">5 Pembicara</option>
+                            <option value="6">6 Pembicara</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-transcribe" id="btn-transcribe" onclick="startTranscription()" disabled>
+                    &#9654; Mulai Transkripsi
+                </button>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="card progress-section" id="progress-section">
+            <div class="card-header"><span>&#9881;</span><h2>Memproses...</h2></div>
+            <div class="card-body">
+                <div class="progress-stages">
+                    <div class="stage" id="stage-upload"><div class="stage-dot">&#128228;</div><div class="stage-label">Upload</div></div>
+                    <div class="stage" id="stage-transcribe"><div class="stage-dot">&#128196;</div><div class="stage-label">Transkripsi</div></div>
+                    <div class="stage" id="stage-diarize"><div class="stage-dot">&#128101;</div><div class="stage-label">Pembicara</div></div>
+                    <div class="stage" id="stage-format"><div class="stage-dot">&#128190;</div><div class="stage-label">Selesai</div></div>
+                </div>
+                <div class="progress-bar-container"><div class="progress-bar" id="progress-bar"></div></div>
+                <div class="progress-text">
+                    <span class="progress-stage-name" id="progress-stage-name">Memulai...</span>
+                    <span class="progress-percentage" id="progress-percentage">0%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div class="card error-section" id="error-section">
+            <div class="card-body">
+                <div class="error-box">
+                    <span style="font-size:22px;color:var(--error)">&#9888;</span>
+                    <div><div class="error-message" id="error-message"></div><div class="error-detail" id="error-detail"></div></div>
+                </div>
+                <button class="btn-retry" onclick="resetUI()">&#8634; Coba Lagi</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="card results-section" id="results-section">
+            <div class="stats-bar" id="stats-bar"></div>
+            <div class="audio-player"><audio id="audio-player" controls preload="auto"></audio></div>
+            <div class="speaker-legend" id="speaker-legend"></div>
+            <div class="search-bar">
+                <input type="text" class="search-input" id="search-input" placeholder="Cari dalam transkrip..." oninput="filterTranscript()">
+            </div>
+            <div class="transcript-container" id="transcript-container"></div>
+            <div class="export-bar">
+                <span class="export-label">Ekspor:</span>
+                <button class="btn-export" onclick="downloadSRT()">&#128196; SRT</button>
+                <button class="btn-export" onclick="downloadTXT()">&#128221; TXT</button>
+                <button class="btn-export" onclick="downloadDOCX()">&#128209; DOCX</button>
+                <button class="btn-copy-all" onclick="copyTranscript()">&#128203; Salin</button>
+                <button class="btn-new" onclick="resetUI()">+ Transkripsi Baru</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">TranscribeAI &mdash; Standalone &bull; Powered by OpenAI Whisper</div>
+    <div class="toast" id="toast"></div>
+
+    <script>
+    // ===================== STATE =====================
+    let currentFile = null;
+    let audioUrl = null;
+    let segments = [];
+    let fileDuration = 0;
+    let decodedChannelData = null;  // Cached decoded audio for reuse
+    let decodedSampleRate = 0;
+    const speakerColors = ['#4F46E5','#DC2626','#059669','#D97706','#7C3AED','#DB2777','#0891B2','#65A30D'];
+
+    // ===================== THEME =====================
+    function toggleTheme() {
+        document.body.classList.toggle('dark');
+        const isDark = document.body.classList.contains('dark');
+        localStorage.setItem('transcribeai-theme', isDark ? 'dark' : 'light');
+        document.getElementById('theme-btn').innerHTML = isDark ? '&#9788;' : '&#9790;';
+    }
+    if (localStorage.getItem('transcribeai-theme') === 'dark') {
+        document.body.classList.add('dark');
+        document.getElementById('theme-btn').innerHTML = '&#9788;';
+    }
+
+    // ===================== API KEY =====================
+    function saveApiKey() {
+        const key = document.getElementById('api-key').value.trim();
+        if (key) localStorage.setItem('transcribeai-key', key);
+        updateBtnState();
+    }
+    function getApiKey() {
+        return document.getElementById('api-key').value.trim() || localStorage.getItem('transcribeai-key') || '';
+    }
+    // Restore saved key
+    const savedKey = localStorage.getItem('transcribeai-key');
+    if (savedKey) document.getElementById('api-key').value = savedKey;
+
+    // ===================== FILE HANDLING =====================
+    const uploadZone = document.getElementById('upload-zone');
+    const fileInput = document.getElementById('file-input');
+    const allowed = ['mp3','mp4','wav','webm','m4a','ogg','flac'];
+
+    uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+    uploadZone.addEventListener('drop', e => {
+        e.preventDefault(); uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+    function handleFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!allowed.includes(ext)) { toast('Format tidak didukung!'); return; }
+        currentFile = file;
+        uploadZone.classList.add('has-file');
+        document.getElementById('upload-placeholder').style.display = 'none';
+        document.getElementById('file-display').style.display = 'block';
+        document.getElementById('file-name').textContent = file.name;
+        document.getElementById('file-size').textContent = formatBytes(file.size);
+        updateBtnState();
+    }
+
+    function removeFile(e) {
+        e.stopPropagation();
+        currentFile = null;
+        uploadZone.classList.remove('has-file');
+        document.getElementById('upload-placeholder').style.display = 'block';
+        document.getElementById('file-display').style.display = 'none';
+        fileInput.value = '';
+        updateBtnState();
+    }
+
+    function updateBtnState() {
+        document.getElementById('btn-transcribe').disabled = !(currentFile && getApiKey());
+    }
+
+    function formatBytes(b) {
+        if (!b) return '0 B';
+        const k = 1024, s = ['B','KB','MB','GB'];
+        const i = Math.floor(Math.log(b) / Math.log(k));
+        return (b / Math.pow(k, i)).toFixed(1) + ' ' + s[i];
+    }
+
+    // ===================== PROGRESS =====================
+    function setProgress(pct, stageName) {
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-stage-name').textContent = stageName;
+        document.getElementById('progress-percentage').textContent = pct + '%';
+        const stages = [
+            { id:'stage-upload', t:5 }, { id:'stage-transcribe', t:20 },
+            { id:'stage-diarize', t:70 }, { id:'stage-format', t:90 }
+        ];
+        stages.forEach((s, idx) => {
+            const el = document.getElementById(s.id);
+            el.classList.remove('active','completed');
+            if (pct >= s.t) {
+                const next = stages[idx+1]?.t || 101;
+                if (pct < next) el.classList.add('active');
+                else { el.classList.add('completed'); el.querySelector('.stage-dot').innerHTML = '&#10003;'; }
+            }
+        });
+    }
+
+    // ===================== TRANSCRIPTION =====================
+    async function startTranscription() {
+        if (!currentFile || !getApiKey()) return;
+        const btn = document.getElementById('btn-transcribe');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Memproses...';
+        document.getElementById('progress-section').classList.add('active');
+        document.getElementById('error-section').classList.remove('active');
+        document.getElementById('results-section').classList.remove('active');
+
+        try {
+            // Get audio as object URL for playback
+            audioUrl = URL.createObjectURL(currentFile);
+            fileDuration = await getAudioDuration(audioUrl);
+
+            setProgress(3, 'Mendecode audio...');
+
+            // Decode audio using Web Audio API (handles MP3, MP4, WAV, etc.)
+            const fileArrayBuffer = await currentFile.arrayBuffer();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let audioBuffer;
+            try {
+                audioBuffer = await audioCtx.decodeAudioData(fileArrayBuffer);
+            } catch (decErr) {
+                throw new Error('Format audio tidak bisa di-decode oleh browser. Coba konversi ke MP3 terlebih dahulu.');
+            }
+            fileDuration = audioBuffer.duration;
+
+            // Cache decoded audio for speaker diarization (avoid re-decoding)
+            decodedChannelData = audioBuffer.getChannelData(0);
+            decodedSampleRate = audioBuffer.sampleRate;
+
+            setProgress(8, 'Mempersiapkan audio chunks...');
+
+            // Create WAV chunks from decoded audio (each ~20MB max, ~10 min per chunk at 16kHz mono)
+            const wavChunks = createWavChunks(audioBuffer, 600); // 600 seconds per chunk
+            audioCtx.close();
+
+            segments = [];
+            for (let i = 0; i < wavChunks.length; i++) {
+                const pct = 10 + Math.floor(55 * (i + 0.5) / wavChunks.length);
+                setProgress(pct, wavChunks.length > 1 ? `Mentranskrip... (${i+1}/${wavChunks.length})` : 'Mentranskrip audio...');
+
+                const wavFile = new File([wavChunks[i].blob], 'audio.wav', { type: 'audio/wav' });
+                const result = await callWhisperAPI(wavFile, getApiKey());
+
+                if (result.segments) {
+                    for (const seg of result.segments) {
+                        if (seg.text?.trim()) {
+                            segments.push({
+                                start: seg.start + wavChunks[i].offset,
+                                end: seg.end + wavChunks[i].offset,
+                                text: seg.text.trim()
+                            });
+                        }
+                    }
+                } else if (result.text) {
+                    segments.push({
+                        start: wavChunks[i].offset,
+                        end: wavChunks[i].offset + wavChunks[i].duration,
+                        text: result.text.trim()
+                    });
+                }
+            }
+
+            if (!segments.length) throw new Error('Tidak ada teks yang terdeteksi dari audio ini.');
+
+            // Simple speaker assignment
+            setProgress(75, 'Mengidentifikasi pembicara...');
+            const numSpeakers = parseInt(document.getElementById('num-speakers').value) || 0;
+            await assignSpeakers(segments, numSpeakers);
+
+            setProgress(90, 'Menyiapkan hasil...');
+            segments = mergeSegments(segments);
+
+            setProgress(100, 'Selesai!');
+            setTimeout(() => showResults(), 500);
+
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    async function getAudioDuration(url) {
+        return new Promise((resolve) => {
+            const a = new Audio();
+            a.addEventListener('loadedmetadata', () => resolve(a.duration));
+            a.addEventListener('error', () => resolve(0));
+            a.src = url;
+        });
+    }
+
+    // Create valid WAV chunks from decoded AudioBuffer
+    function createWavChunks(audioBuffer, maxSecondsPerChunk) {
+        const sampleRate = 16000; // Resample to 16kHz for Whisper
+        const origRate = audioBuffer.sampleRate;
+        const origData = audioBuffer.getChannelData(0); // Mono channel 0
+        const totalDuration = audioBuffer.duration;
+
+        // Resample to 16kHz using linear interpolation
+        const ratio = origRate / sampleRate;
+        const resampledLength = Math.floor(origData.length / ratio);
+        const resampled = new Float32Array(resampledLength);
+        for (let i = 0; i < resampledLength; i++) {
+            const pos = i * ratio;
+            const idx = Math.floor(pos);
+            const frac = pos - idx;
+            const a = origData[Math.min(idx, origData.length - 1)];
+            const b = origData[Math.min(idx + 1, origData.length - 1)];
+            resampled[i] = a + frac * (b - a); // Linear interpolation
+        }
+
+        // Split into chunks
+        const samplesPerChunk = maxSecondsPerChunk * sampleRate;
+        const chunks = [];
+        let offset = 0;
+
+        for (let start = 0; start < resampled.length; start += samplesPerChunk) {
+            const end = Math.min(start + samplesPerChunk, resampled.length);
+            const chunkSamples = resampled.slice(start, end);
+            const wavBlob = encodeWav(chunkSamples, sampleRate);
+            const chunkDuration = chunkSamples.length / sampleRate;
+            chunks.push({ blob: wavBlob, offset: offset, duration: chunkDuration });
+            offset += chunkDuration;
+        }
+
+        return chunks;
+    }
+
+    // Encode Float32Array samples as a WAV Blob
+    function encodeWav(samples, sampleRate) {
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+        const blockAlign = numChannels * bitsPerSample / 8;
+        const dataSize = samples.length * blockAlign;
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+
+        // WAV header
+        writeString(view, 0, 'RIFF');
+        view.setUint32(4, 36 + dataSize, true);
+        writeString(view, 8, 'WAVE');
+        writeString(view, 12, 'fmt ');
+        view.setUint32(16, 16, true);            // Subchunk1Size (PCM)
+        view.setUint16(20, 1, true);              // AudioFormat (PCM)
+        view.setUint16(22, numChannels, true);    // NumChannels
+        view.setUint32(24, sampleRate, true);     // SampleRate
+        view.setUint32(28, byteRate, true);       // ByteRate
+        view.setUint16(32, blockAlign, true);     // BlockAlign
+        view.setUint16(34, bitsPerSample, true);  // BitsPerSample
+        writeString(view, 36, 'data');
+        view.setUint32(40, dataSize, true);       // Subchunk2Size
+
+        // Write PCM samples (convert float32 to int16)
+        let pos = 44;
+        for (let i = 0; i < samples.length; i++) {
+            let s = Math.max(-1, Math.min(1, samples[i]));
+            s = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            view.setInt16(pos, s, true);
+            pos += 2;
+        }
+
+        return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+
+    async function callWhisperAPI(file, apiKey) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('model', 'whisper-1');
+        formData.append('response_format', 'verbose_json');
+        formData.append('timestamp_granularities[]', 'segment');
+
+        const lang = document.getElementById('language').value;
+        if (lang) formData.append('language', lang);
+
+        const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: formData
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error?.message || `API Error: ${res.status}`);
+        }
+        return await res.json();
+    }
+
+    // ===================== SIMPLE SPEAKER ASSIGNMENT =====================
+    async function assignSpeakers(segs, numSpeakers) {
+        if (!segs.length) return;
+
+        if (numSpeakers === 1 || segs.length < 3) {
+            segs.forEach(s => { s.speaker = 'Speaker 1'; s.speaker_id = 0; });
+            return;
+        }
+
+        // Use cached decoded audio (avoids re-decoding large files)
+        try {
+            const channelData = decodedChannelData;
+            const sampleRate = decodedSampleRate;
+
+            if (!channelData || !sampleRate) throw new Error('No cached audio');
+
+            // Extract basic features per segment
+            const features = segs.map(seg => {
+                const start = Math.floor(seg.start * sampleRate);
+                const end = Math.min(Math.floor(seg.end * sampleRate), channelData.length);
+                if (end <= start || end - start < 100) return { energy: 0, zcr: 0, pitch: 0 };
+
+                // Limit analysis window to max 2 seconds (performance)
+                const maxSamples = sampleRate * 2;
+                const sliceEnd = Math.min(start + maxSamples, end);
+                const slice = channelData.slice(start, sliceEnd);
+
+                // RMS energy
+                let energy = 0;
+                for (let i = 0; i < slice.length; i++) energy += slice[i] * slice[i];
+                energy = Math.sqrt(energy / slice.length);
+
+                // Zero crossing rate
+                let zcr = 0;
+                for (let i = 1; i < slice.length; i++) {
+                    if ((slice[i] >= 0) !== (slice[i-1] >= 0)) zcr++;
+                }
+                zcr /= slice.length;
+
+                // Pitch estimation (limited window to prevent freeze)
+                let pitch = estimatePitch(slice, sampleRate);
+
+                return { energy, zcr, pitch };
+            });
+
+            // Normalize
+            const keys = ['energy', 'zcr', 'pitch'];
+            keys.forEach(k => {
+                const vals = features.map(f => f[k]);
+                const min = Math.min(...vals), max = Math.max(...vals);
+                const range = max - min || 1;
+                features.forEach(f => f[k] = (f[k] - min) / range);
+            });
+
+            // Simple k-means-like clustering
+            const n = numSpeakers > 0 ? numSpeakers : autoDetectSpeakers(features);
+            const labels = kMeansCluster(features, n);
+
+            labels.forEach((label, i) => {
+                segs[i].speaker = `Speaker ${label + 1}`;
+                segs[i].speaker_id = label;
+            });
+        } catch (e) {
+            // Fallback: alternate speakers based on pauses
+            let sid = 0;
+            segs[0].speaker = 'Speaker 1'; segs[0].speaker_id = 0;
+            for (let i = 1; i < segs.length; i++) {
+                const gap = segs[i].start - segs[i-1].end;
+                if (gap > 1.5) sid = (sid + 1) % (numSpeakers || 2);
+                segs[i].speaker = `Speaker ${sid + 1}`;
+                segs[i].speaker_id = sid;
+            }
+        }
+    }
+
+    function estimatePitch(signal, sr) {
+        // Limit analysis to max 4096 samples to prevent browser freeze
+        const analysisLen = Math.min(signal.length, 4096);
+        const minLag = Math.floor(sr / 500); // 500 Hz max
+        const maxLag = Math.min(Math.floor(sr / 50), Math.floor(analysisLen / 2)); // 50 Hz min
+        if (maxLag <= minLag) return 150; // Default fallback
+        let bestCorr = -1, bestLag = minLag;
+        for (let lag = minLag; lag < maxLag; lag++) {
+            let corr = 0;
+            for (let i = 0; i < analysisLen - lag; i++) corr += signal[i] * signal[i + lag];
+            if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+        }
+        return sr / bestLag;
+    }
+
+    function autoDetectSpeakers(features) {
+        // Try 2-4 speakers, pick best silhouette
+        let bestK = 2, bestScore = -1;
+        for (let k = 2; k <= Math.min(4, features.length - 1); k++) {
+            const labels = kMeansCluster(features, k);
+            const score = silhouetteScore(features, labels, k);
+            if (score > bestScore) { bestScore = score; bestK = k; }
+        }
+        return bestK;
+    }
+
+    function kMeansCluster(features, k, maxIter = 20) {
+        if (features.length <= k) return features.map((_, i) => i);
+        const keys = ['energy', 'zcr', 'pitch'];
+        // Initialize centroids with k-means++
+        let centroids = [features[Math.floor(Math.random() * features.length)]];
+        for (let c = 1; c < k; c++) {
+            const dists = features.map(f => {
+                const minD = Math.min(...centroids.map(cen => dist(f, cen, keys)));
+                return minD * minD;
+            });
+            const sum = dists.reduce((a, b) => a + b, 0);
+            let r = Math.random() * sum, acc = 0;
+            for (let i = 0; i < dists.length; i++) {
+                acc += dists[i];
+                if (acc >= r) { centroids.push(features[i]); break; }
+            }
+        }
+
+        let labels = new Array(features.length).fill(0);
+        for (let iter = 0; iter < maxIter; iter++) {
+            // Assign
+            labels = features.map(f => {
+                let minD = Infinity, minK = 0;
+                centroids.forEach((c, ki) => { const d = dist(f, c, keys); if (d < minD) { minD = d; minK = ki; } });
+                return minK;
+            });
+            // Update
+            const newCentroids = Array.from({ length: k }, () => ({ energy: 0, zcr: 0, pitch: 0, count: 0 }));
+            labels.forEach((l, i) => { keys.forEach(key => newCentroids[l][key] += features[i][key]); newCentroids[l].count++; });
+            centroids = newCentroids.map(c => {
+                const n = c.count || 1;
+                return { energy: c.energy / n, zcr: c.zcr / n, pitch: c.pitch / n };
+            });
+        }
+        return labels;
+    }
+
+    function dist(a, b, keys) {
+        return Math.sqrt(keys.reduce((s, k) => s + (a[k] - b[k]) ** 2, 0));
+    }
+
+    function silhouetteScore(features, labels, k) {
+        const keys = ['energy', 'zcr', 'pitch'];
+        let totalS = 0, count = 0;
+        features.forEach((f, i) => {
+            const cluster = labels[i];
+            const same = features.filter((_, j) => j !== i && labels[j] === cluster);
+            if (!same.length) return;
+            const a = same.reduce((s, g) => s + dist(f, g, keys), 0) / same.length;
+            let minB = Infinity;
+            for (let c = 0; c < k; c++) {
+                if (c === cluster) continue;
+                const others = features.filter((_, j) => labels[j] === c);
+                if (!others.length) continue;
+                const b = others.reduce((s, g) => s + dist(f, g, keys), 0) / others.length;
+                if (b < minB) minB = b;
+            }
+            if (minB === Infinity) return;
+            totalS += (minB - a) / Math.max(a, minB);
+            count++;
+        });
+        return count ? totalS / count : 0;
+    }
+
+    function mergeSegments(segs) {
+        if (!segs.length) return segs;
+        const merged = [{ ...segs[0] }];
+        for (let i = 1; i < segs.length; i++) {
+            const last = merged[merged.length - 1];
+            if (segs[i].speaker === last.speaker) {
+                last.end = segs[i].end;
+                last.text += ' ' + segs[i].text;
+            } else {
+                merged.push({ ...segs[i] });
+            }
+        }
+        return merged;
+    }
+
+    // ===================== SHOW RESULTS =====================
+    function showResults() {
+        document.getElementById('progress-section').classList.remove('active');
+        document.getElementById('upload-card').style.display = 'none';
+        document.getElementById('results-section').classList.add('active');
+
+        const langNames = { 'id': 'Indonesia', 'en': 'English', '': 'Auto' };
+        const lang = document.getElementById('language').value;
+        const nSpeakers = new Set(segments.map(s => s.speaker)).size;
+
+        document.getElementById('stats-bar').innerHTML = `
+            <div class="stat"><span>&#9201;</span><div><div class="stat-label">Durasi</div><div class="stat-value">${fmtDur(fileDuration)}</div></div></div>
+            <div class="stat"><span>&#128101;</span><div><div class="stat-label">Pembicara</div><div class="stat-value">${nSpeakers}</div></div></div>
+            <div class="stat"><span>&#128196;</span><div><div class="stat-label">Segmen</div><div class="stat-value">${segments.length}</div></div></div>
+            <div class="stat"><span>&#127760;</span><div><div class="stat-label">Bahasa</div><div class="stat-value">${langNames[lang] || lang}</div></div></div>
+        `;
+
+        document.getElementById('audio-player').src = audioUrl;
+
+        const speakers = [...new Set(segments.map(s => s.speaker))].sort();
+        document.getElementById('speaker-legend').innerHTML = speakers.map(sp => {
+            const sid = segments.find(s => s.speaker === sp)?.speaker_id || 0;
+            return `<span class="speaker-badge"><span class="dot" style="background:${speakerColors[sid % speakerColors.length]}"></span>${sp}</span>`;
+        }).join('');
+
+        renderTranscript();
+        document.getElementById('audio-player').addEventListener('timeupdate', syncTranscript);
+    }
+
+    function renderTranscript(filter = '') {
+        const container = document.getElementById('transcript-container');
+        container.innerHTML = segments.filter(seg =>
+            !filter || seg.text.toLowerCase().includes(filter) || seg.speaker.toLowerCase().includes(filter)
+        ).map((seg, i) => {
+            const color = speakerColors[(seg.speaker_id || 0) % speakerColors.length];
+            return `<div class="transcript-segment" data-start="${seg.start}" data-end="${seg.end}" onclick="seekAudio(${seg.start})">
+                <div class="segment-time">${fmtTime(seg.start)}</div>
+                <div class="segment-content">
+                    <div class="segment-speaker" style="color:${color}"><span class="speaker-dot" style="background:${color}"></span>${seg.speaker}</div>
+                    <div class="segment-text">${seg.text}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function syncTranscript() {
+        const t = document.getElementById('audio-player').currentTime;
+        document.querySelectorAll('.transcript-segment').forEach(el => {
+            const s = parseFloat(el.dataset.start), e = parseFloat(el.dataset.end);
+            el.classList.toggle('playing', t >= s && t < e);
+        });
+        const playing = document.querySelector('.transcript-segment.playing');
+        if (playing) {
+            const c = document.getElementById('transcript-container');
+            const cr = c.getBoundingClientRect(), sr = playing.getBoundingClientRect();
+            if (sr.top < cr.top || sr.bottom > cr.bottom) playing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function seekAudio(t) {
+        const a = document.getElementById('audio-player');
+        a.currentTime = t;
+        if (a.paused) a.play();
+    }
+
+    function filterTranscript() {
+        renderTranscript(document.getElementById('search-input').value.toLowerCase());
+    }
+
+    // ===================== EXPORT =====================
+    function downloadSRT() {
+        let srt = '';
+        segments.forEach((s, i) => {
+            srt += `${i+1}\n${fmtTs(s.start)} --> ${fmtTs(s.end)}\n[${s.speaker}] ${s.text}\n\n`;
+        });
+        download(srt, baseName() + '_transcript.srt', 'text/plain');
+    }
+
+    function downloadTXT() {
+        let txt = `TRANSCRIPT\n${'='.repeat(60)}\nFile: ${currentFile?.name || ''}\nGenerated: ${new Date().toLocaleString()}\n${'='.repeat(60)}\n\n`;
+        let cur = null;
+        segments.forEach(s => {
+            if (s.speaker !== cur) { cur = s.speaker; txt += `\n[${fmtTime(s.start)}] ${s.speaker}:\n`; }
+            txt += s.text + '\n';
+        });
+        download(txt, baseName() + '_transcript.txt', 'text/plain');
+    }
+
+    async function downloadDOCX() {
+        const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+        const colorMap = {0:'4F46E5',1:'DC2626',2:'059669',3:'D97706',4:'7C3AED',5:'DB2777',6:'0891B2',7:'65A30D'};
+        const children = [];
+
+        children.push(new Paragraph({ heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: 'Transcript', bold: true, size: 48, font: 'Calibri' })]
+        }));
+
+        const meta = [`File: ${currentFile?.name || ''}`, `Generated: ${new Date().toLocaleString()}`,
+            `Speakers: ${[...new Set(segments.map(s=>s.speaker))].sort().join(', ')}`];
+        meta.forEach(m => children.push(new Paragraph({ children: [new TextRun({ text: m, size: 20, color: '888888', font: 'Calibri' })], spacing: { after: 40 } })));
+
+        children.push(new Paragraph({ children: [new TextRun({ text: '_'.repeat(70), color: 'CCCCCC' })], spacing: { after: 200 } }));
+
+        segments.forEach(seg => {
+            const color = colorMap[(seg.speaker_id||0) % Object.keys(colorMap).length];
+            children.push(new Paragraph({
+                spacing: { after: 240 },
+                children: [
+                    new TextRun({ text: `[${fmtTime(seg.start)}]  `, size: 18, color: '999999', font: 'Calibri' }),
+                    new TextRun({ text: seg.speaker + '\n', bold: true, size: 22, color, font: 'Calibri' }),
+                    new TextRun({ text: seg.text, size: 22, color: '1E1E1E', font: 'Calibri' })
+                ]
+            }));
+        });
+
+        const doc = new Document({ sections: [{ children }] });
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, baseName() + '_transcript.docx');
+    }
+
+    function copyTranscript() {
+        const txt = segments.map(s => `[${fmtTime(s.start)}] ${s.speaker}:\n${s.text}`).join('\n\n');
+        navigator.clipboard.writeText(txt).then(() => toast('Transkrip disalin!'));
+    }
+
+    // ===================== ERROR / RESET =====================
+    function showError(msg) {
+        document.getElementById('progress-section').classList.remove('active');
+        document.getElementById('error-section').classList.add('active');
+        document.getElementById('error-message').textContent = 'Transkripsi gagal';
+        document.getElementById('error-detail').textContent = msg;
+        const btn = document.getElementById('btn-transcribe');
+        btn.disabled = false; btn.innerHTML = '&#9654; Mulai Transkripsi';
+    }
+
+    function resetUI() {
+        // Cleanup memory
+        if (audioUrl) { URL.revokeObjectURL(audioUrl); }
+        currentFile = null; segments = []; audioUrl = null;
+        decodedChannelData = null; decodedSampleRate = 0;
+
+        document.getElementById('upload-card').style.display = '';
+        document.getElementById('progress-section').classList.remove('active');
+        document.getElementById('error-section').classList.remove('active');
+        document.getElementById('results-section').classList.remove('active');
+        uploadZone.classList.remove('has-file');
+        document.getElementById('upload-placeholder').style.display = 'block';
+        document.getElementById('file-display').style.display = 'none';
+        fileInput.value = '';
+        document.getElementById('search-input').value = '';
+        document.getElementById('audio-player').src = '';
+        updateBtnState();
+        const btn = document.getElementById('btn-transcribe');
+        btn.innerHTML = '&#9654; Mulai Transkripsi';
+
+        // Reset stage icons back to original
+        const stageIcons = { 'stage-upload': '&#128228;', 'stage-transcribe': '&#128196;', 'stage-diarize': '&#128101;', 'stage-format': '&#128190;' };
+        Object.entries(stageIcons).forEach(([id, icon]) => {
+            const el = document.getElementById(id);
+            el.classList.remove('active', 'completed');
+            el.querySelector('.stage-dot').innerHTML = icon;
+        });
+    }
+
+    // ===================== HELPERS =====================
+    function fmtTime(s) { return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+    function fmtTs(s) { const h=Math.floor(s/3600),m=Math.floor(s%3600/60),sc=Math.floor(s%60),ms=Math.floor(s%1*1000); return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sc).padStart(2,'0')},${String(ms).padStart(3,'0')}`; }
+    function fmtDur(s) { const h=Math.floor(s/3600),m=Math.floor(s%3600/60),sc=Math.floor(s%60); return h>0?`${h}j ${m}m ${sc}d`:m>0?`${m}m ${sc}d`:`${sc}d`; }
+    function baseName() { return (currentFile?.name || 'audio').replace(/\.[^.]+$/, ''); }
+    function download(content, name, type) { const b = new Blob([content], { type }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; a.click(); }
+    function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+
+    updateBtnState();
+    </script>
+</body>
+</html>

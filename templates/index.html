@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TranscribeAI - Local Transcription</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0f11;--surface:#1a1a1f;--surface2:#222228;--surface3:#2a2a32;
+  --border:#333340;--border2:#444455;
+  --text:#e8e8ed;--text2:#a0a0b0;--text3:#6a6a7a;
+  --primary:#6366f1;--primary2:#818cf8;--primary-glow:rgba(99,102,241,.15);
+  --green:#10b981;--green2:#34d399;--red:#ef4444;--amber:#f59e0b;
+  --blue:#3b82f6;--purple:#8b5cf6;
+}
+body{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5}
+a{color:var(--primary2);text-decoration:none}
+
+/* Layout */
+.app{max-width:1100px;margin:0 auto;padding:20px 24px 60px}
+.header{text-align:center;padding:40px 0 30px}
+.header h1{font-size:28px;font-weight:700;background:linear-gradient(135deg,var(--primary2),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:-.5px}
+.header p{color:var(--text2);font-size:13px;margin-top:6px}
+.badge{display:inline-flex;align-items:center;gap:5px;background:var(--primary-glow);color:var(--primary2);font-size:11px;padding:3px 10px;border-radius:20px;margin-top:8px;font-weight:500}
+.badge::before{content:'';width:6px;height:6px;background:var(--green);border-radius:50%}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title svg{width:16px;height:16px;opacity:.6}
+
+/* Form */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+.form-label{font-size:12px;font-weight:500;color:var(--text2)}
+select,input[type=number]{width:100%;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+select:focus,input:focus{border-color:var(--primary)}
+select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236a6a7a' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.model-hint{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.toggle-row label{font-size:13px;color:var(--text2)}
+.toggle{position:relative;width:40px;height:22px;cursor:pointer;flex-shrink:0}
+.toggle input{display:none}
+.toggle-track{position:absolute;inset:0;background:var(--surface3);border-radius:11px;border:1px solid var(--border);transition:.2s}
+.toggle input:checked+.toggle-track{background:var(--primary);border-color:var(--primary)}
+.toggle-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked~.toggle-knob{left:21px}
+
+/* Drop zone */
+.dropzone{border:2px dashed var(--border);border-radius:14px;padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.dropzone:hover,.dropzone.dragover{border-color:var(--primary);background:var(--primary-glow)}
+.dropzone-icon{font-size:36px;margin-bottom:10px;opacity:.5}
+.dropzone h3{font-size:15px;font-weight:600;color:var(--text)}
+.dropzone p{font-size:12px;color:var(--text3);margin-top:4px}
+.dropzone.has-file{border-color:var(--green);background:rgba(16,185,129,.06)}
+.file-info{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:10px}
+.file-info span{font-size:13px;color:var(--green2)}
+.file-info .remove{color:var(--text3);cursor:pointer;font-size:12px;text-decoration:underline}
+
+/* Buttons */
+.btn{padding:10px 22px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary2);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-sm{padding:7px 14px;font-size:12px;border-radius:8px}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary2)}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap}
+
+.action-bar{display:flex;align-items:center;justify-content:space-between;margin-top:16px;gap:12px}
+
+/* Progress */
+#progress-section{display:none}
+.progress-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;text-align:center}
+.progress-bar-container{width:100%;height:8px;background:var(--surface3);border-radius:4px;overflow:hidden;margin:16px 0 12px}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--purple));border-radius:4px;transition:width .3s ease;width:0}
+.progress-text{font-size:13px;color:var(--text2)}
+.progress-pct{font-size:28px;font-weight:700;color:var(--text);margin-bottom:4px}
+.progress-stage{font-size:14px;color:var(--primary2);font-weight:500;margin-bottom:12px}
+
+/* Stages */
+.stages{display:flex;justify-content:center;gap:16px;margin-top:18px}
+.stage-item{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:70px}
+.stage-dot{width:36px;height:36px;border-radius:50%;background:var(--surface3);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;transition:.3s}
+.stage-dot.active{border-color:var(--primary);background:var(--primary-glow);color:var(--primary2);animation:pulse 1.5s infinite}
+.stage-dot.done{border-color:var(--green);background:rgba(16,185,129,.12);color:var(--green)}
+.stage-dot.download{border-color:var(--amber);background:rgba(245,158,11,.12);color:var(--amber);animation:pulse 1.5s infinite}
+.stage-label{font-size:11px;color:var(--text3);text-align:center}
+.stage-sub{font-size:10px;color:var(--text3);max-width:80px;text-align:center;word-break:break-word}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Result */
+#result-section{display:none}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:var(--surface2);border-radius:10px;padding:14px 16px;text-align:center}
+.stat-val{font-size:22px;font-weight:700;color:var(--text)}
+.stat-label{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* Search */
+.search-bar{position:relative;margin-bottom:14px}
+.search-bar input{width:100%;padding:10px 14px 10px 36px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;outline:none}
+.search-bar input:focus{border-color:var(--primary)}
+.search-bar svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--text3)}
+.search-count{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text3)}
+
+/* Transcript */
+.transcript{max-height:500px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+.transcript::-webkit-scrollbar{width:6px}
+.transcript::-webkit-scrollbar-track{background:transparent}
+.transcript::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px}
+
+.seg{padding:12px 16px;border-bottom:1px solid rgba(51,51,64,.5);cursor:pointer;transition:background .15s}
+.seg:hover{background:var(--surface2)}
+.seg:last-child{border-bottom:none}
+.seg.active{background:var(--primary-glow);border-left:3px solid var(--primary)}
+.seg.highlight .seg-text{background:rgba(245,158,11,.15);border-radius:3px;padding:1px 3px}
+.seg-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.seg-time{font-size:11px;color:var(--text3);font-family:'JetBrains Mono','Fira Code',monospace;min-width:45px}
+.seg-speaker{font-size:12px;font-weight:600;padding:1px 8px;border-radius:4px;color:#fff}
+.seg-text{font-size:13.5px;color:var(--text);line-height:1.6}
+
+/* Audio Player */
+.audio-player{background:var(--surface2);border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:14px}
+.play-btn{width:36px;height:36px;border-radius:50%;background:var(--primary);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
+.play-btn:hover{background:var(--primary2)}
+.play-btn svg{width:16px;height:16px}
+.audio-track{flex:1;display:flex;flex-direction:column;gap:5px}
+.audio-bar{width:100%;height:4px;background:var(--surface3);border-radius:2px;cursor:pointer;position:relative}
+.audio-fill{height:100%;background:var(--primary);border-radius:2px;transition:width .1s linear;width:0}
+.audio-times{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);font-family:monospace}
+.audio-speed{padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text2);font-size:11px;cursor:pointer}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:13px;color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.3);transform:translateY(100px);opacity:0;transition:.3s;z-index:100}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.error{border-color:var(--red);color:var(--red)}
+
+/* Error */
+.error-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:10px;padding:16px 20px;color:var(--red);font-size:13px;text-align:center;margin-top:12px;display:none}
+
+/* Responsive */
+@media(max-width:640px){
+  .app{padding:12px 14px 40px}
+  .header{padding:24px 0 20px}
+  .header h1{font-size:22px}
+  .form-grid{grid-template-columns:1fr}
+  .stages{gap:16px}
+  .stage-label{display:none}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .action-bar{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1>TranscribeAI</h1>
+    <p>Transkripsi Audio Lokal &bull; Identifikasi Pembicara &bull; 100% Offline</p>
+    <div class="badge">faster-whisper &bull; Tanpa API Key</div>
+  </div>
+
+  <!-- Upload Section -->
+  <div id="upload-section">
+    <!-- Settings Card -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Pengaturan
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <span class="form-label">Model</span>
+          <select id="sel-model">
+            <option value="tiny">tiny (39M) &mdash; Tercepat</option>
+            <option value="base">base (74M) &mdash; Sangat Cepat</option>
+            <option value="small" selected>small (244M) &mdash; Cepat &amp; Akurat</option>
+            <option value="medium">medium (769M) &mdash; Lebih Akurat</option>
+            <option value="large-v3">large-v3 (1.5B) &mdash; Paling Akurat</option>
+          </select>
+          <span class="model-hint" id="model-hint">Direkomendasikan untuk CPU. Download otomatis saat pertama kali.</span>
+        </div>
+        <div class="form-group">
+          <span class="form-label">Bahasa</span>
+          <select id="sel-lang">
+            <option value="auto">Auto-detect</option>
+            <option value="id">Indonesia</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <span class="form-label">Engine</span>
+          <select id="sel-engine">
+            <option value="faster-whisper">faster-whisper (CPU)</option>
+          </select>
+          <span class="engine-hint" id="engine-hint" style="font-size:11px;color:var(--text3);margin-top:2px"></span>
+        </div>
+        <div class="form-group">
+          <span class="form-label">Jumlah Pembicara</span>
+          <select id="sel-speakers">
+            <option value="0">Otomatis</option>
+            <option value="2">2 Pembicara</option>
+            <option value="3">3 Pembicara</option>
+            <option value="4">4 Pembicara</option>
+            <option value="5">5 Pembicara</option>
+            <option value="6">6 Pembicara</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <span class="form-label">Opsi</span>
+          <div style="display:flex;flex-direction:column;gap:4px;padding-top:2px">
+            <div class="toggle-row">
+              <label>Diarization (identifikasi pembicara)</label>
+              <label class="toggle"><input type="checkbox" id="chk-diarize" checked><span class="toggle-track"></span><span class="toggle-knob"></span></label>
+            </div>
+            <div class="toggle-row">
+              <label>VAD Filter (hapus bagian hening)</label>
+              <label class="toggle"><input type="checkbox" id="chk-vad" checked><span class="toggle-track"></span><span class="toggle-knob"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dropzone -->
+    <div class="dropzone" id="dropzone">
+      <div class="dropzone-icon">&#128193;</div>
+      <h3>Drag &amp; drop file audio/video di sini</h3>
+      <p>Atau klik untuk memilih file &bull; MP3, MP4, WAV, M4A, OGG, FLAC, WEBM</p>
+      <input type="file" id="file-input" accept=".mp3,.mp4,.wav,.webm,.m4a,.ogg,.flac,.wma,.aac" hidden>
+      <div class="file-info" id="file-info" style="display:none">
+        <span id="file-name"></span>
+        <span class="remove" id="file-remove">hapus</span>
+      </div>
+    </div>
+
+    <div class="error-box" id="upload-error"></div>
+
+    <!-- Model status banner -->
+    <div id="model-status" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-top:12px;font-size:13px">
+      <span id="model-status-icon"></span>
+      <span id="model-status-text"></span>
+    </div>
+
+    <div class="action-bar">
+      <div></div>
+      <button class="btn btn-primary" id="btn-start" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg>
+        Mulai Transkripsi
+      </button>
+    </div>
+  </div>
+
+  <!-- Progress Section -->
+  <div id="progress-section">
+    <div class="progress-card">
+      <div class="progress-pct" id="prog-pct">0%</div>
+      <div class="progress-stage" id="prog-stage">Menunggu...</div>
+      <div class="progress-bar-container"><div class="progress-bar" id="prog-bar"></div></div>
+      <div class="progress-text" id="prog-text">Memproses file Anda secara lokal...</div>
+
+      <div class="stages">
+        <div class="stage-item">
+          <div class="stage-dot" id="stage-upload">1</div>
+          <span class="stage-label">Upload</span>
+          <span class="stage-sub" id="stage-upload-sub"></span>
+        </div>
+        <div class="stage-item">
+          <div class="stage-dot" id="stage-model">2</div>
+          <span class="stage-label">Model</span>
+          <span class="stage-sub" id="stage-model-sub"></span>
+        </div>
+        <div class="stage-item">
+          <div class="stage-dot" id="stage-transcribe">3</div>
+          <span class="stage-label">Transkripsi</span>
+          <span class="stage-sub" id="stage-transcribe-sub"></span>
+        </div>
+        <div class="stage-item">
+          <div class="stage-dot" id="stage-diarize">4</div>
+          <span class="stage-label">Pembicara</span>
+          <span class="stage-sub" id="stage-diarize-sub"></span>
+        </div>
+        <div class="stage-item">
+          <div class="stage-dot" id="stage-export">5</div>
+          <span class="stage-label">Ekspor</span>
+          <span class="stage-sub" id="stage-export-sub"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Section -->
+  <div id="result-section">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid"></div>
+
+    <!-- Audio player -->
+    <div class="audio-player" id="audio-player" style="display:none">
+      <button class="play-btn" id="btn-play">
+        <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <div class="audio-track">
+        <div class="audio-bar" id="audio-bar"><div class="audio-fill" id="audio-fill"></div></div>
+        <div class="audio-times"><span id="audio-cur">00:00</span><span id="audio-dur">00:00</span></div>
+      </div>
+      <button class="audio-speed" id="btn-speed">1x</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Cari dalam transkrip...">
+      <span class="search-count" id="search-count"></span>
+    </div>
+
+    <!-- Transcript -->
+    <div class="transcript" id="transcript"></div>
+
+    <!-- Export buttons -->
+    <div class="action-bar" style="margin-top:14px">
+      <button class="btn btn-outline btn-sm" id="btn-new">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Transkripsi Baru
+      </button>
+      <div class="btn-group">
+        <button class="btn btn-outline btn-sm" id="btn-srt">&#11015; SRT</button>
+        <button class="btn btn-outline btn-sm" id="btn-txt">&#11015; TXT</button>
+        <button class="btn btn-primary btn-sm" id="btn-docx">&#11015; DOCX</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Audio element -->
+<audio id="audio-el" preload="auto"></audio>
+
+<script>
+(function() {
+  'use strict';
+
+  // ===========================
+  // DOM Elements
+  // ===========================
+  var qs = function(s) { return document.querySelector(s); };
+  var selModel = qs('#sel-model');
+  var selLang = qs('#sel-lang');
+  var selEngine = qs('#sel-engine');
+  var selSpeakers = qs('#sel-speakers');
+  var chkDiarize = qs('#chk-diarize');
+  var chkVad = qs('#chk-vad');
+  var dropzone = qs('#dropzone');
+  var fileInput = qs('#file-input');
+  var btnStart = qs('#btn-start');
+  var uploadSection = qs('#upload-section');
+  var progressSection = qs('#progress-section');
+  var resultSection = qs('#result-section');
+  var audioEl = qs('#audio-el');
+  var searchInput = qs('#search-input');
+
+  var selectedFile = null;
+  var currentJobId = null;
+  var pollTimer = null;
+  var resultData = null;
+  var audioLoaded = false;
+
+  // ===========================
+  // Model Hint + Status Check
+  // ===========================
+  var modelHints = {
+    'tiny': 'Paling cepat. Akurasi rendah. Cocok untuk tes cepat.',
+    'base': 'Cepat dengan akurasi yang lumayan.',
+    'small': 'Direkomendasikan untuk CPU. Keseimbangan kecepatan & akurasi.',
+    'medium': 'Akurasi tinggi tapi lebih lambat di CPU.',
+    'large-v3': 'Akurasi terbaik. Sangat lambat di CPU (butuh RAM besar).'
+  };
+  selModel.addEventListener('change', function() {
+    qs('#model-hint').textContent = modelHints[selModel.value] || '';
+    checkModelStatus();
+  });
+
+  function checkModelStatus() {
+    var model = selModel.value;
+    fetch('/api/model-status/' + model)
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var box = qs('#model-status');
+        var icon = qs('#model-status-icon');
+        var txt = qs('#model-status-text');
+        box.style.display = 'block';
+        if (d.cached) {
+          box.style.borderColor = 'rgba(16,185,129,.3)';
+          box.style.background = 'rgba(16,185,129,.06)';
+          icon.textContent = '\u2705 ';
+          txt.textContent = 'Model ' + model + ' sudah terdownload. Siap digunakan!';
+          txt.style.color = '#34d399';
+        } else {
+          box.style.borderColor = 'rgba(245,158,11,.3)';
+          box.style.background = 'rgba(245,158,11,.06)';
+          icon.textContent = '\u2B07\uFE0F ';
+          txt.textContent = 'Model ' + model + ' belum terdownload. Akan download ~' + d.download_mb + 'MB saat pertama kali (butuh internet).';
+          txt.style.color = '#fbbf24';
+        }
+      })
+      .catch(function() {});
+  }
+  // Check on page load
+  checkModelStatus();
+
+  // Load available engines
+  function loadEngines() {
+    fetch('/api/engine-info')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        selEngine.innerHTML = '';
+        d.engines.forEach(function(eng) {
+          if (eng.available) {
+            var opt = document.createElement('option');
+            opt.value = eng.id;
+            opt.textContent = eng.name;
+            if (eng.id === d.default) opt.selected = true;
+            selEngine.appendChild(opt);
+          }
+        });
+        updateEngineHint();
+        // If mlx is available, show speed tip
+        if (d.apple_silicon && d.engines.some(function(e) { return e.id === 'mlx'; })) {
+          qs('#engine-hint').textContent = 'Apple Silicon detected! MLX = 2-5x lebih cepat.';
+          qs('#engine-hint').style.color = '#34d399';
+        } else if (d.apple_silicon) {
+          qs('#engine-hint').innerHTML = 'Apple Silicon terdeteksi. Install mlx-whisper untuk 2-5x lebih cepat: <code style="background:var(--surface3);padding:1px 5px;border-radius:3px;font-size:10px">pip install mlx-whisper</code>';
+          qs('#engine-hint').style.color = '#fbbf24';
+        }
+      })
+      .catch(function() {});
+  }
+  loadEngines();
+
+  function updateEngineHint() {
+    var eng = selEngine.value;
+    if (eng === 'mlx') {
+      qs('#engine-hint').textContent = 'Apple Silicon GPU — 2-5x lebih cepat!';
+      qs('#engine-hint').style.color = '#34d399';
+    } else {
+      qs('#engine-hint').textContent = 'CPU mode — kompatibel semua sistem.';
+      qs('#engine-hint').style.color = 'var(--text3)';
+    }
+  }
+  selEngine.addEventListener('change', updateEngineHint);
+
+  // ===========================
+  // File Selection
+  // ===========================
+  dropzone.addEventListener('click', function() { fileInput.click(); });
+  dropzone.addEventListener('dragover', function(e) { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', function() { dropzone.classList.remove('dragover'); });
+  dropzone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function(e) {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    var ext = file.name.split('.').pop().toLowerCase();
+    var allowed = ['mp3','mp4','wav','webm','m4a','ogg','flac','wma','aac'];
+    if (allowed.indexOf(ext) === -1) {
+      showToast('Format tidak didukung. Gunakan: ' + allowed.join(', '), true);
+      return;
+    }
+    selectedFile = file;
+    dropzone.classList.add('has-file');
+    qs('#file-name').textContent = file.name + ' (' + formatSize(file.size) + ')';
+    qs('#file-info').style.display = 'flex';
+    btnStart.disabled = false;
+    qs('#upload-error').style.display = 'none';
+  }
+
+  qs('#file-remove').addEventListener('click', function(e) {
+    e.stopPropagation();
+    selectedFile = null;
+    dropzone.classList.remove('has-file');
+    qs('#file-info').style.display = 'none';
+    fileInput.value = '';
+    btnStart.disabled = true;
+  });
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  // ===========================
+  // Start Transcription
+  // ===========================
+  btnStart.addEventListener('click', startTranscription);
+
+  function startTranscription() {
+    if (!selectedFile) return;
+
+    // Switch UI
+    uploadSection.style.display = 'none';
+    progressSection.style.display = 'block';
+    resultSection.style.display = 'none';
+    resetProgress();
+
+    var formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('language', selLang.value);
+    formData.append('num_speakers', selSpeakers.value);
+    formData.append('model_size', selModel.value);
+    formData.append('enable_diarization', chkDiarize.checked ? 'true' : 'false');
+    formData.append('enable_vad', chkVad.checked ? 'true' : 'false');
+    formData.append('engine', selEngine.value);
+
+    qs('#prog-stage').textContent = 'Mengunggah file ke server lokal...';
+    qs('#prog-pct').textContent = '0%';
+    qs('#prog-text').textContent = 'Mengirim file ke server lokal (tidak ke internet)...';
+    // Mark upload stage as active
+    qs('#stage-upload').className = 'stage-dot active';
+    qs('#stage-upload').innerHTML = '\u21BB';
+    qs('#stage-upload-sub').textContent = 'mengirim...';
+
+    fetch('/api/upload', { method: 'POST', body: formData })
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+        currentJobId = data.job_id;
+        startPolling();
+      })
+      .catch(function(err) {
+        showError('Gagal mengunggah file: ' + err.message);
+      });
+  }
+
+  // ===========================
+  // Polling
+  // ===========================
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(pollStatus, 800);
+  }
+
+  function pollStatus() {
+    if (!currentJobId) return;
+    fetch('/api/status/' + currentJobId)
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        updateProgress(data);
+        if (data.status === 'completed') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          resultData = data.result;
+          showResult(data);
+        } else if (data.status === 'error') {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          showError(data.error || 'Terjadi kesalahan');
+        }
+      })
+      .catch(function() { /* retry on next poll */ });
+  }
+
+  // ===========================
+  // Progress UI
+  // ===========================
+  function resetProgress() {
+    qs('#prog-pct').textContent = '0%';
+    qs('#prog-bar').style.width = '0';
+    qs('#prog-stage').textContent = 'Menunggu...';
+    qs('#prog-text').textContent = 'Memproses file Anda secara lokal...';
+    var ids = ['stage-upload','stage-model','stage-transcribe','stage-diarize','stage-export'];
+    ids.forEach(function(id, i) {
+      var el = document.getElementById(id);
+      el.className = 'stage-dot';
+      el.textContent = String(i + 1);
+      var sub = document.getElementById(id + '-sub');
+      if (sub) sub.textContent = '';
+    });
+  }
+
+  function updateProgress(data) {
+    var pct = data.progress || 0;
+    var stage = data.stage || '';
+    qs('#prog-pct').textContent = pct + '%';
+    qs('#prog-bar').style.width = pct + '%';
+    qs('#prog-stage').textContent = stage;
+
+    var stUp = qs('#stage-upload');
+    var stModel = qs('#stage-model');
+    var stTrans = qs('#stage-transcribe');
+    var stDiar = qs('#stage-diarize');
+    var stExport = qs('#stage-export');
+
+    // Detect if downloading model
+    var isDownloading = stage.indexOf('Mengunduh') !== -1;
+    var isLoading = stage.indexOf('Memuat') !== -1;
+
+    // Upload done (server received file)
+    stUp.className = 'stage-dot done';
+    stUp.innerHTML = '\u2713';
+    qs('#stage-upload-sub').textContent = 'selesai';
+
+    // Model stage (2-10%)
+    if (pct >= 2 && pct < 10) {
+      if (isDownloading) {
+        stModel.className = 'stage-dot download';
+        stModel.innerHTML = '\u2B07';
+        qs('#stage-model-sub').textContent = 'downloading...';
+        qs('#prog-text').textContent = 'Download model pertama kali. Hanya sekali saja, selanjutnya offline.';
+      } else if (isLoading) {
+        stModel.className = 'stage-dot active';
+        stModel.innerHTML = '\u21BB';
+        qs('#stage-model-sub').textContent = 'memuat...';
+        qs('#prog-text').textContent = 'Memuat model dari cache lokal...';
+      } else {
+        stModel.className = 'stage-dot active';
+        stModel.innerHTML = '\u21BB';
+      }
+    }
+    if (pct >= 10) {
+      stModel.className = 'stage-dot done';
+      stModel.innerHTML = '\u2713';
+      qs('#stage-model-sub').textContent = 'siap';
+    }
+
+    // Transcription stage (10-60%)
+    if (pct >= 11 && pct < 60) {
+      stTrans.className = 'stage-dot active';
+      stTrans.innerHTML = '\u21BB';
+      // Extract time progress from stage text
+      var timeMatch = stage.match(/(\d+:\d+)\s*\/\s*(\d+:\d+)/);
+      if (timeMatch) {
+        qs('#stage-transcribe-sub').textContent = timeMatch[1] + '/' + timeMatch[2];
+      } else {
+        qs('#stage-transcribe-sub').textContent = 'memproses...';
+      }
+      qs('#prog-text').textContent = 'Mentranskripsi audio menggunakan faster-whisper...';
+    }
+    if (pct >= 60) {
+      stTrans.className = 'stage-dot done';
+      stTrans.innerHTML = '\u2713';
+      qs('#stage-transcribe-sub').textContent = 'selesai';
+    }
+
+    // Diarization stage (60-85%)
+    if (pct >= 61 && pct < 85) {
+      stDiar.className = 'stage-dot active';
+      stDiar.innerHTML = '\u21BB';
+      qs('#stage-diarize-sub').textContent = 'analisis...';
+      qs('#prog-text').textContent = 'Mengidentifikasi pembicara dengan MFCC + clustering...';
+    }
+    if (pct >= 85) {
+      stDiar.className = 'stage-dot done';
+      stDiar.innerHTML = '\u2713';
+      qs('#stage-diarize-sub').textContent = 'selesai';
+    }
+
+    // Export stage (85-100%)
+    if (pct >= 86 && pct < 100) {
+      stExport.className = 'stage-dot active';
+      stExport.innerHTML = '\u21BB';
+      qs('#stage-export-sub').textContent = 'SRT,TXT,DOCX';
+      qs('#prog-text').textContent = 'Membuat file output SRT, TXT, dan DOCX...';
+    }
+    if (pct >= 100) {
+      stExport.className = 'stage-dot done';
+      stExport.innerHTML = '\u2713';
+      qs('#stage-export-sub').textContent = 'selesai';
+      qs('#prog-text').textContent = 'Transkripsi selesai!';
+    }
+  }
+
+  // ===========================
+  // Error
+  // ===========================
+  function showError(msg) {
+    uploadSection.style.display = 'block';
+    progressSection.style.display = 'none';
+    var errEl = qs('#upload-error');
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+    showToast(msg, true);
+  }
+
+  // ===========================
+  // Show Result
+  // ===========================
+  function showResult(data) {
+    progressSection.style.display = 'none';
+    resultSection.style.display = 'block';
+
+    var r = data.result;
+    var segments = r.segments || [];
+
+    // Stats
+    var duration = r.duration || 0;
+    var langNames = { id: 'Indonesia', en: 'English', auto: 'Auto' };
+    qs('#stats-grid').innerHTML =
+      '<div class="stat-card"><div class="stat-val">' + fmtTime(duration) + '</div><div class="stat-label">Durasi</div></div>' +
+      '<div class="stat-card"><div class="stat-val">' + r.total_segments + '</div><div class="stat-label">Segmen</div></div>' +
+      '<div class="stat-card"><div class="stat-val">' + r.num_speakers + '</div><div class="stat-label">Pembicara</div></div>' +
+      '<div class="stat-card"><div class="stat-val">' + (langNames[r.language] || r.language) + '</div><div class="stat-label">Bahasa</div></div>' +
+      '<div class="stat-card"><div class="stat-val">' + r.model + '</div><div class="stat-label">Model</div></div>';
+
+    // Transcript
+    var colors = r.speaker_colors || ['#6366f1','#ef4444','#10b981','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#84cc16','#ea580c','#6366f1'];
+    var txDiv = qs('#transcript');
+    txDiv.innerHTML = '';
+
+    segments.forEach(function(seg, i) {
+      var div = document.createElement('div');
+      div.className = 'seg';
+      div.setAttribute('data-idx', i);
+      div.setAttribute('data-start', seg.start);
+      div.setAttribute('data-end', seg.end);
+
+      var sid = seg.speaker_id || 0;
+      var color = colors[sid % colors.length];
+
+      div.innerHTML =
+        '<div class="seg-header">' +
+          '<span class="seg-time">' + fmtTime(seg.start) + '</span>' +
+          '<span class="seg-speaker" style="background:' + color + '">' + escHtml(seg.speaker || 'Speaker 1') + '</span>' +
+        '</div>' +
+        '<div class="seg-text">' + escHtml(seg.text) + '</div>';
+
+      div.addEventListener('click', function() { seekAudio(seg.start); });
+      txDiv.appendChild(div);
+    });
+
+    // Load audio
+    loadAudio();
+  }
+
+  // ===========================
+  // Audio Player
+  // ===========================
+  var btnPlay = qs('#btn-play');
+  var audioBar = qs('#audio-bar');
+  var speedBtn = qs('#btn-speed');
+  var speeds = [1, 1.25, 1.5, 1.75, 2, 0.5, 0.75];
+  var speedIdx = 0;
+
+  function loadAudio() {
+    if (!currentJobId) return;
+    audioEl.src = '/api/audio/' + currentJobId;
+    audioEl.load();
+
+    audioEl.addEventListener('loadedmetadata', function onMeta() {
+      audioLoaded = true;
+      qs('#audio-player').style.display = 'flex';
+      qs('#audio-dur').textContent = fmtTime(audioEl.duration);
+      audioEl.removeEventListener('loadedmetadata', onMeta);
+    });
+
+    audioEl.addEventListener('timeupdate', function() {
+      if (!audioEl.duration) return;
+      var pct = (audioEl.currentTime / audioEl.duration) * 100;
+      qs('#audio-fill').style.width = pct + '%';
+      qs('#audio-cur').textContent = fmtTime(audioEl.currentTime);
+
+      // Highlight active segment
+      var segs = document.querySelectorAll('.seg');
+      for (var j = 0; j < segs.length; j++) {
+        var el = segs[j];
+        var s = parseFloat(el.getAttribute('data-start'));
+        var e = parseFloat(el.getAttribute('data-end'));
+        if (audioEl.currentTime >= s && audioEl.currentTime < e) {
+          if (!el.classList.contains('active')) {
+            el.classList.add('active');
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        } else {
+          el.classList.remove('active');
+        }
+      }
+    });
+
+    audioEl.addEventListener('ended', function() {
+      qs('#icon-play').style.display = '';
+      qs('#icon-pause').style.display = 'none';
+    });
+  }
+
+  btnPlay.addEventListener('click', function() {
+    if (audioEl.paused) {
+      audioEl.play();
+      qs('#icon-play').style.display = 'none';
+      qs('#icon-pause').style.display = '';
+    } else {
+      audioEl.pause();
+      qs('#icon-play').style.display = '';
+      qs('#icon-pause').style.display = 'none';
+    }
+  });
+
+  audioBar.addEventListener('click', function(e) {
+    if (!audioEl.duration) return;
+    var rect = audioBar.getBoundingClientRect();
+    var pct = (e.clientX - rect.left) / rect.width;
+    audioEl.currentTime = pct * audioEl.duration;
+  });
+
+  speedBtn.addEventListener('click', function() {
+    speedIdx = (speedIdx + 1) % speeds.length;
+    audioEl.playbackRate = speeds[speedIdx];
+    speedBtn.textContent = speeds[speedIdx] + 'x';
+  });
+
+  function seekAudio(time) {
+    if (!audioLoaded) return;
+    audioEl.currentTime = time;
+    if (audioEl.paused) {
+      audioEl.play();
+      qs('#icon-play').style.display = 'none';
+      qs('#icon-pause').style.display = '';
+    }
+  }
+
+  // ===========================
+  // Search
+  // ===========================
+  var searchDebounce = null;
+
+  searchInput.addEventListener('input', function() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(doSearch, 250);
+  });
+
+  function doSearch() {
+    var q = searchInput.value.trim().toLowerCase();
+    var segs = document.querySelectorAll('.seg');
+    var count = 0;
+
+    for (var j = 0; j < segs.length; j++) {
+      var el = segs[j];
+      var text = el.querySelector('.seg-text').textContent.toLowerCase();
+      if (q && text.indexOf(q) !== -1) {
+        el.classList.add('highlight');
+        el.style.display = '';
+        count++;
+      } else if (q) {
+        el.classList.remove('highlight');
+        el.style.display = 'none';
+      } else {
+        el.classList.remove('highlight');
+        el.style.display = '';
+      }
+    }
+
+    qs('#search-count').textContent = q ? count + ' hasil' : '';
+  }
+
+  // ===========================
+  // Export
+  // ===========================
+  qs('#btn-srt').addEventListener('click', function() { downloadFile('srt'); });
+  qs('#btn-txt').addEventListener('click', function() { downloadFile('txt'); });
+  qs('#btn-docx').addEventListener('click', function() { downloadFile('docx'); });
+
+  function downloadFile(fmt) {
+    if (!currentJobId) return;
+    window.location.href = '/api/download/' + currentJobId + '/' + fmt;
+  }
+
+  // ===========================
+  // New Transcription
+  // ===========================
+  qs('#btn-new').addEventListener('click', function() {
+    resultSection.style.display = 'none';
+    uploadSection.style.display = 'block';
+    currentJobId = null;
+    resultData = null;
+    audioEl.pause();
+    audioEl.src = '';
+    audioLoaded = false;
+    qs('#audio-player').style.display = 'none';
+    qs('#icon-play').style.display = '';
+    qs('#icon-pause').style.display = 'none';
+    searchInput.value = '';
+    qs('#search-count').textContent = '';
+    qs('#upload-error').style.display = 'none';
+  });
+
+  // ===========================
+  // Toast
+  // ===========================
+  function showToast(msg, isError) {
+    var toast = qs('#toast');
+    toast.textContent = msg;
+    toast.className = 'toast show' + (isError ? ' error' : '');
+    setTimeout(function() { toast.className = 'toast'; }, 3500);
+  }
+
+  // ===========================
+  // Helpers
+  // ===========================
+  function fmtTime(s) {
+    var m = Math.floor(s / 60);
+    var sec = Math.floor(s % 60);
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function escHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+})();
+</script>
+</body>
+</html>
