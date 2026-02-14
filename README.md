@@ -221,8 +221,8 @@ MIT License — free for personal and commercial use.
 ---
 
 <p align="center">
-  <strong>🇮🇩 Made in Indonesia</strong><br>
-  Built with ❤️ and AI by <a href="https://github.com/romizone">@romizone</a>
+  <strong>🇮🇩 Made in Jakarta, Indonesia</strong><br>
+  Built with ❤️ by <strong>Romi Nur Ismanto</strong> · <a href="https://github.com/romizone">@romizone</a>
 </p>
 
 <p align="center">
